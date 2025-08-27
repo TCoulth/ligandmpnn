@@ -177,7 +177,7 @@ class ProteinMPNN(torch.nn.Module):
 
         return h_V, h_E, E_idx
 
-    def sample(self, feature_dict):
+    def sample(self, feature_dict, inside_out_decoding: bool = False):
         # xyz_37 = feature_dict["xyz_37"] #[B,L,37,3] - xyz coordinates for all atoms if needed
         # xyz_37_m = feature_dict["xyz_37_m"] #[B,L,37] - mask for all coords
         # Y = feature_dict["Y"] #[B,L,num_context_atoms,3] - for ligandMPNN coords
@@ -216,9 +216,45 @@ class ProteinMPNN(torch.nn.Module):
         h_V, h_E, E_idx = self.encode(feature_dict)
 
         chain_mask = mask * chain_mask  # update chain_M to include missing regions
-        decoding_order = torch.argsort(
-            (chain_mask + 0.0001) * (torch.abs(randn))
-        )  # [numbers will be smaller for places where chain_M = 0.0 and higher for places where chain_M = 1.0]
+
+        # Decode semi-randomly starting from nearest residues to context atoms
+        if inside_out_decoding:
+            # Calculate min dist from each Cb to context atom(s)
+            context_atoms = feature_dict["Y"] # [B, L, num_context_atoms, 3]
+            Cb_atoms = feature_dict["X"][:, :, -1, :]
+            Cb_to_cxt_dist = Cb_atoms[:, :, None, :] - context_atoms # [B, L, num_context_atoms, 3]
+            Cb_to_cxt_dist = Cb_to_cxt_dist.square().sum(-1).sqrt() # [B, L, num_context_atoms]
+            Cb_to_cxt_dist = torch.amin(Cb_to_cxt_dist, dim=-1) # [B, L]
+ 
+            # Mask out fixed/nonexistent residues
+            Cb_to_cxt_dist *= chain_mask
+
+            quantiles = torch.tensor([0.2, 0.4, 0.6, 0.8, 1.0]).to(S_true.device)
+            quantiles = torch.quantile(Cb_to_cxt_dist, quantiles, dim=-1)
+
+            # Add fixed/nonexistent residues first
+            min_q = 0.
+            randn_q = []    
+            fixed_res = torch.where(Cb_to_cxt_dist.squeeze(0) == 0)[0]
+            randn_q.append(fixed_res)
+
+            # Collect and randomize residues in each quantile
+            for q in quantiles:
+                q_res = (Cb_to_cxt_dist <= q) * (Cb_to_cxt_dist > min_q) # [1, L]
+                q_res = torch.where(q_res.squeeze(0))[0] # [X]
+                q_res = q_res[torch.randperm(q_res.size(0))]
+                randn_q.append(q_res)
+                min_q = q
+
+            # Collect all quantiles
+            randn_q = torch.cat(randn_q).expand(randn.shape[0], -1)
+            decoding_order = randn_q
+
+        else:
+            decoding_order = torch.argsort(
+                (chain_mask + 0.0001) * (torch.abs(randn))
+            )  # [numbers will be smaller for places where chain_M = 0.0 and higher for places where chain_M = 1.0]
+
         if len(symmetry_list_of_lists[0]) == 0 and len(symmetry_list_of_lists) == 1:
             E_idx = E_idx.repeat(B_decoder, 1, 1)
             permutation_matrix_reverse = torch.nn.functional.one_hot(
