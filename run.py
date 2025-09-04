@@ -423,7 +423,7 @@ def main(args, design_run: bool = False) -> None:
                     [feature_dict["batch_size"], feature_dict["mask"].shape[1]],
                     device=device,
                 )
-                output_dict = model.sample(feature_dict)
+                output_dict = model.sample(feature_dict, args.inside_out_decoding)
 
                 # compute confidence scores
                 loss, loss_per_residue = get_score(
@@ -990,6 +990,12 @@ if __name__ == "__main__":
         type=int,
         default=1,
         help="1-pack side chains using ligand context, 0 - do not use it.",
+    )
+
+    argparser.add_argument(
+        "--inside_out_decoding", 
+        action="store_true", 
+        help="Use 'inside-out' decoding scheme which decodes residues near ligands first. Off by default."
     )
 
     args = argparser.parse_args()
