@@ -81,6 +81,7 @@ def collect_standard_residues(model, chain_id: str) -> List[Tuple[object, str]]:
 
 def get_res_by_tokens(model, tokens: Iterable[str], default_chain: str) -> List[object]:
     out = []
+    print('asfhbfbkfs',tokens)
     for tok in (tokens or []):
         try:
             chain, resseq, icode = parse_residue_token(tok, default_chain)
@@ -277,8 +278,6 @@ def run(
         for i, lock in enumerate(run_spec.locks or []):
             dprint(f"    [LOCK {i+1}] raw residues: {lock.residues} | layers={lock.layers} | cutoff={lock.cutoff}")
         for lock in (run_spec.locks or []):
-            print(lock)
-
             seed_residues = get_res_by_tokens(model, lock.residues, chain_id)
             dprint(f"      seeds matched on chain {chain_id}: {len(seed_residues)}")
             seen = set(seed_residues)
@@ -361,7 +360,7 @@ def main():
                             pdb_id=args.pdbid, 
                             chain=args.chain, 
                             include_resnames=["CYS","ASP","GLU","HIS","LYS","ARG","SER","TYR"],
-                            locks=[LockSpec(residues=args.lock_inputres, 
+                            locks=[LockSpec(residues=_normalize_residues_field(args.lock_inputres), 
                                             layers=args.layers_num,
                                             cutoff=args.layers_cutoff)
                                     ]
@@ -369,7 +368,7 @@ def main():
     else:
         print("You need to designate a config file or a pdbid")
         exit()
-
+    print(runs[0].locks)
     run(
         runs=runs,
         pdb_dir=args.pdb_dir,
