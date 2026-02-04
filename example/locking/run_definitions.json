@@ -1,0 +1,36 @@
+{
+  "1BTL": {
+    "name": "1BTL",
+    "pdb_id": "1BTL",
+    "chain": "A",
+    "include_resnames": [
+      "CYS",
+      "ASP",
+      "GLU",
+      "HIS",
+      "LYS",
+      "ARG",
+      "SER",
+      "TYR"
+    ],
+    "default_chain": "A",
+    "locks": [
+      {
+        "residues": [
+          "70",
+          "130",
+          "132",
+          "166",
+          "170",
+          "234",
+          "236",
+          "236",
+          "237",
+          "234"
+        ],
+        "layers": 2,
+        "cutoff": 5
+      }
+    ]
+  }
+}
